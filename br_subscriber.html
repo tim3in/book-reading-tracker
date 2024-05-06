@@ -1,0 +1,96 @@
+<html>
+<head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+<style>
+  #status{
+    background-color:#f5cff3;
+    width:400px;
+    height:300px;
+    text-align: center;
+    margin: auto;
+    padding: 50px;
+    box-shadow: rgba(6, 24, 44, 0.4) 0px 0px 0px 2px, rgba(6, 24, 44, 0.65) 0px 4px 6px -1px, rgba(255, 255, 255, 0.08) 0px 1px 0px inset;
+  }
+</style>
+</head>
+<body>
+ <h1 style="text-align: center;">Book Reading Time Tracker</h1>
+
+ <div id="status"><img src="book.png" style="width:50%">
+ <h3 id="msg">NA</h3></div>
+
+<script type="text/javascript">
+// Create a client instance
+
+client = new Paho.MQTT.Client("broker.hivemq.com", 8000 ,"br-client-001");
+
+// set callback handlers
+client.onConnectionLost = onConnectionLost;
+client.onMessageArrived = onMessageArrived;
+
+// connect the client
+client.connect({onSuccess:onConnect});
+
+
+// called when the client connects
+function onConnect() {
+  // Once a connection has been made, make a subscription and send a message.
+ console.log("onConnect");
+ client.subscribe("book_status");
+
+}
+
+// called when the client loses its connection
+function onConnectionLost(responseObject) {
+  if (responseObject.errorCode !== 0) {
+    console.log("onConnectionLost:"+responseObject.errorMessage);
+  }
+}
+
+let bookStatus = null; // Variable to store the status of the book
+let readingStartTime = null; // Variable to store the start time of reading
+let hasOpened = false; // Flag to track whether the book has been opened at least once
+
+// Function to handle MQTT messages
+function onMessageArrived(message) {
+  const currentTime = new Date().toLocaleTimeString();
+  
+  if (!hasOpened && message.payloadString === "opened") {
+    hasOpened = true;
+  }
+
+  if (hasOpened) {
+    if (bookStatus !== message.payloadString) {
+      bookStatus = message.payloadString;
+
+      if (bookStatus === "opened") {
+        readingStartTime = new Date();
+        console.log("reading started at " + currentTime);
+        document.getElementById("msg").innerHTML = "Reading Started at " + currentTime;
+      } else if (bookStatus === "closed") {
+        if (readingStartTime) {
+          const readingEndTime = new Date();
+          const duration = calculateDuration(readingStartTime, readingEndTime);
+          console.log("reading ended at " + currentTime + ", duration: " + duration);
+          document.getElementById("msg").innerHTML = "Reading Ended at " + currentTime + ", Duration: " + duration;
+          readingStartTime = null; // Reset reading start time
+        } else {
+          console.log("reading ended at " + currentTime);
+          document.getElementById("msg").innerHTML = "Reading Ended at " + currentTime;
+        }
+      }
+    }
+  }
+}
+
+// Function to calculate duration in hours and minutes
+function calculateDuration(startTime, endTime) {
+  const diff = endTime - startTime;
+  const hours = Math.floor(diff / 3600000); // 1 hour = 3600000 ms
+  const minutes = Math.floor((diff % 3600000) / 60000); // 1 minute = 60000 ms
+  return hours + " hours and " + minutes + " minutes";
+}
+
+</script>
+</body>
+</html>
